@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "observable preview"
+    "dev": "observable preview",
+    "build": "observable build"
   },
   "devDependencies": {
     "@types/bun": "latest"
