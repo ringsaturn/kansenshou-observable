@@ -3,23 +3,6 @@
 日本における主要感染症の発生動向を分析します。データは国立健康危機管理研究機構より提供されています。
 
 ```js
-const teitenResult = await sql`
-  SELECT * FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
-`;
-const teitenData = Array.from(teitenResult);
-
-const zensuResult = await sql`
-  SELECT * FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
-`;
-const zensuData = Array.from(zensuResult);
-
-const ariResult = await sql`
-  SELECT * FROM read_parquet('https://kansenshou.ringsaturn.me/data/ari/merged_ari.parquet')
-`;
-const ariData = Array.from(ariResult);
-```
-
-```js
 const diseaseColors = {
   "インフルエンザ": "steelblue",
   "COVID-19": "darkred",
@@ -49,20 +32,6 @@ function trend(v) {
   return v >= 0.01 ? html`<span class="green">↗︎</span>`
     : v <= -0.01 ? html`<span class="red">↘︎</span>`
     : "→";
-}
-
-function heatmapData(data, field, minYear = 2015) {
-  const grouped = d3.group(data.filter(d => d.都道府県 === "総数" && d[field] != null && d.年 >= minYear), 
-    d => d.年, 
-    d => d.週);
-  
-  return Array.from(grouped, ([year, weeks]) => 
-    Array.from(weeks, ([week, records]) => ({
-      年: year,
-      週: week,
-      値: records[0][field]
-    }))
-  ).flat();
 }
 
 function heatmapPlot(data, field, title, minValue = null, maxValue = null) {
@@ -111,9 +80,11 @@ function heatmapPlot(data, field, title, minValue = null, maxValue = null) {
 ## 🦠 インフルエンザ
 
 ```js
-const fluData = teitenData
-  .filter(d => d.都道府県 === "総数" && d.インフルエンザ_定当 != null)
-  .sort((a, b) => new Date(a.開始日) - new Date(b.開始日));
+const fluData = Array.from(await sql`
+  SELECT * FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
+  WHERE 都道府県 = '総数' AND インフルエンザ_定当 IS NOT NULL
+  ORDER BY 開始日
+`);
 
 const fluLatest = fluData[fluData.length - 1];
 const fluPrevWeek = fluData[fluData.length - 2];
@@ -240,13 +211,13 @@ function fluCard(latest, prevWeek, prevYear, weeks52) {
 ### 主要都道府県比較（2020年以降）
 
 ```js
-const fluPrefectures = teitenData
-  .filter(d =>
-    ["東京都", "大阪府", "北海道", "福岡県", "愛知県", "沖縄県"].includes(d.都道府県) &&
-    d.インフルエンザ_定当 != null &&
-    d.年 >= 2020
-  )
-  .sort((a, b) => new Date(a.開始日) - new Date(b.開始日));
+const fluPrefectures = Array.from(await sql`
+  SELECT * FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
+  WHERE 都道府県 IN ('東京都', '大阪府', '北海道', '福岡県', '愛知県', '沖縄県')
+    AND インフルエンザ_定当 IS NOT NULL
+    AND 年 >= 2020
+  ORDER BY 開始日
+`);
 ```
 
 <div class="grid grid-cols-1">
@@ -275,7 +246,15 @@ const fluPrefectures = teitenData
 ### 週別熱力図（2015年〜）
 
 ```js
-const fluHeatmap = heatmapData(teitenData, "インフルエンザ_定当");
+const fluHeatmap = Array.from(await sql`
+  SELECT 
+    年,
+    週,
+    インフルエンザ_定当 as 値
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
+  WHERE 都道府県 = '総数' AND インフルエンザ_定当 IS NOT NULL AND 年 >= 2015
+  ORDER BY 年, 週
+`);
 ```
 
 <div class="grid grid-cols-1">
@@ -290,9 +269,11 @@ const fluHeatmap = heatmapData(teitenData, "インフルエンザ_定当");
 ## 🦠 COVID-19
 
 ```js
-const covidData = teitenData
-  .filter(d => d.都道府県 === "総数" && d["COVID-19_定当"] != null)
-  .sort((a, b) => new Date(a.開始日) - new Date(b.開始日));
+const covidData = Array.from(await sql`
+  SELECT * FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
+  WHERE 都道府県 = '総数' AND "COVID-19_定当" IS NOT NULL
+  ORDER BY 開始日
+`);
 
 const covidLatest = covidData[covidData.length - 1];
 const covid52Weeks = covidData.slice(-52);
@@ -378,7 +359,15 @@ function covidCard(latest, weeks52) {
 ### 週別熱力図（2020年〜）
 
 ```js
-const covidHeatmap = heatmapData(teitenData, "COVID-19_定当", 2020);
+const covidHeatmap = Array.from(await sql`
+  SELECT 
+    年,
+    週,
+    "COVID-19_定当" as 値
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
+  WHERE 都道府県 = '総数' AND "COVID-19_定当" IS NOT NULL AND 年 >= 2020
+  ORDER BY 年, 週
+`);
 ```
 
 <div class="grid grid-cols-1">
@@ -393,16 +382,15 @@ const covidHeatmap = heatmapData(teitenData, "COVID-19_定当", 2020);
 ## 🦠 梅毒
 
 ```js
-const syphilisYearly = Array.from(
-  d3.group(
-    zensuData.filter(d => d.都道府県 === "総数" && d.梅毒_報告 != null),
-    d => d.年
-  ),
-  ([year, values]) => ({
-    年: year,
-    年間総報告数: d3.sum(values, d => d.梅毒_報告)
-  })
-).sort((a, b) => a.年 - b.年);
+const syphilisYearly = Array.from(await sql`
+  SELECT 
+    年,
+    SUM(梅毒_報告) as 年間総報告数
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
+  WHERE 都道府県 = '総数' AND 梅毒_報告 IS NOT NULL
+  GROUP BY 年
+  ORDER BY 年
+`);
 
 const syphilisLatest = syphilisYearly[syphilisYearly.length - 1];
 ```
@@ -490,19 +478,15 @@ function syphilisCard(latest, yearly) {
 ### 週別熱力図（2015年〜）
 
 ```js
-const syphilisWeekly = zensuData
-  .filter(d => d.都道府県 === "総数" && d.梅毒_報告 != null && d.年 >= 2015)
-  .sort((a, b) => a.年 * 100 + a.週 - (b.年 * 100 + b.週));
-
-const syphilisHeatmap = Array.from(
-  d3.group(syphilisWeekly, d => d.年, d => d.週),
-  ([year, weeks]) => 
-    Array.from(weeks, ([week, records]) => ({
-      年: year,
-      週: week,
-      値: records[0].梅毒_報告
-    }))
-).flat();
+const syphilisHeatmap = Array.from(await sql`
+  SELECT 
+    年,
+    週,
+    梅毒_報告 as 値
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
+  WHERE 都道府県 = '総数' AND 梅毒_報告 IS NOT NULL AND 年 >= 2015
+  ORDER BY 年, 週
+`);
 ```
 
 <div class="grid grid-cols-1">
@@ -513,16 +497,15 @@ const syphilisHeatmap = Array.from(
 </div>
 
 ```js
-const pertussisYearly = Array.from(
-  d3.group(
-    zensuData.filter(d => d.都道府県 === "総数" && d.百日咳_報告 != null),
-    d => d.年
-  ),
-  ([year, values]) => ({
-    年: year,
-    年間総報告数: d3.sum(values, d => d.百日咳_報告)
-  })
-).sort((a, b) => a.年 - b.年);
+const pertussisYearly = Array.from(await sql`
+  SELECT 
+    年,
+    SUM(百日咳_報告) as 年間総報告数
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
+  WHERE 都道府県 = '総数' AND 百日咳_報告 IS NOT NULL
+  GROUP BY 年
+  ORDER BY 年
+`);
 
 const pertussisLatest = pertussisYearly[pertussisYearly.length - 1];
 ```
@@ -610,19 +593,15 @@ function pertussisCard(latest, yearly) {
 ### 週別熱力図（2015年〜）
 
 ```js
-const pertussisWeekly = zensuData
-  .filter(d => d.都道府県 === "総数" && d.百日咳_報告 != null && d.年 >= 2015)
-  .sort((a, b) => a.年 * 100 + a.週 - (b.年 * 100 + b.週));
-
-const pertussisHeatmap = Array.from(
-  d3.group(pertussisWeekly, d => d.年, d => d.週),
-  ([year, weeks]) => 
-    Array.from(weeks, ([week, records]) => ({
-      年: year,
-      週: week,
-      値: records[0].百日咳_報告
-    }))
-).flat();
+const pertussisHeatmap = Array.from(await sql`
+  SELECT 
+    年,
+    週,
+    百日咳_報告 as 値
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
+  WHERE 都道府県 = '総数' AND 百日咳_報告 IS NOT NULL AND 年 >= 2015
+  ORDER BY 年, 週
+`);
 ```
 
 <div class="grid grid-cols-1">
@@ -637,9 +616,11 @@ const pertussisHeatmap = Array.from(
 ## 🦠 RSウイルス感染症
 
 ```js
-const rsData = teitenData
-  .filter(d => d.都道府県 === "総数" && d.ＲＳウイルス感染症_定当 != null && d.年 >= 2020)
-  .sort((a, b) => new Date(a.開始日) - new Date(b.開始日));
+const rsData = Array.from(await sql`
+  SELECT * FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
+  WHERE 都道府県 = '総数' AND ＲＳウイルス感染症_定当 IS NOT NULL AND 年 >= 2020
+  ORDER BY 開始日
+`);
 
 const rsLatest = rsData[rsData.length - 1];
 const rsPrevWeek = rsData[rsData.length - 2];
@@ -733,7 +714,15 @@ function rsCard(latest, prevWeek, weeks52) {
 ### 週別熱力図（2020年〜）
 
 ```js
-const rsHeatmap = heatmapData(teitenData, "ＲＳウイルス感染症_定当", 2020);
+const rsHeatmap = Array.from(await sql`
+  SELECT 
+    年,
+    週,
+    ＲＳウイルス感染症_定当 as 値
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
+  WHERE 都道府県 = '総数' AND ＲＳウイルス感染症_定当 IS NOT NULL AND 年 >= 2020
+  ORDER BY 年, 週
+`);
 ```
 
 <div class="grid grid-cols-1">
@@ -748,9 +737,11 @@ const rsHeatmap = heatmapData(teitenData, "ＲＳウイルス感染症_定当", 
 ## 🦠 感染性胃腸炎
 
 ```js
-const gastroData = teitenData
-  .filter(d => d.都道府県 === "総数" && d.感染性胃腸炎_定当 != null && d.年 >= 2020)
-  .sort((a, b) => new Date(a.開始日) - new Date(b.開始日));
+const gastroData = Array.from(await sql`
+  SELECT * FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
+  WHERE 都道府県 = '総数' AND 感染性胃腸炎_定当 IS NOT NULL AND 年 >= 2020
+  ORDER BY 開始日
+`);
 
 const gastroLatest = gastroData[gastroData.length - 1];
 const gastroPrevWeek = gastroData[gastroData.length - 2];
@@ -844,7 +835,15 @@ function gastroCard(latest, prevWeek, weeks52) {
 ### 週別熱力図（2020年〜）
 
 ```js
-const gastroHeatmap = heatmapData(teitenData, "感染性胃腸炎_定当", 2020);
+const gastroHeatmap = Array.from(await sql`
+  SELECT 
+    年,
+    週,
+    感染性胃腸炎_定当 as 値
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
+  WHERE 都道府県 = '総数' AND 感染性胃腸炎_定当 IS NOT NULL AND 年 >= 2020
+  ORDER BY 年, 週
+`);
 ```
 
 <div class="grid grid-cols-1">
@@ -859,9 +858,11 @@ const gastroHeatmap = heatmapData(teitenData, "感染性胃腸炎_定当", 2020)
 ## 🦠 急性呼吸器感染症（ARI）
 
 ```js
-const ariDataFiltered = ariData
-  .filter(d => d.都道府県 === "総数" && d.急性呼吸器感染症_定当 != null)
-  .sort((a, b) => new Date(a.開始日) - new Date(b.開始日));
+const ariDataFiltered = Array.from(await sql`
+  SELECT * FROM read_parquet('https://kansenshou.ringsaturn.me/data/ari/merged_ari.parquet')
+  WHERE 都道府県 = '総数' AND 急性呼吸器感染症_定当 IS NOT NULL
+  ORDER BY 開始日
+`);
 
 const ariLatest = ariDataFiltered[ariDataFiltered.length - 1];
 const ariPrevWeek = ariDataFiltered[ariDataFiltered.length - 2];
@@ -958,11 +959,15 @@ function ariCard(latest, prevWeek, allData) {
 ### 週別熱力図（2025年）
 
 ```js
-const ariHeatmap = ariDataFiltered.map(d => ({
-  年: d.年,
-  週: d.週,
-  値: d.急性呼吸器感染症_定当
-}));
+const ariHeatmap = Array.from(await sql`
+  SELECT 
+    年,
+    週,
+    急性呼吸器感染症_定当 as 値
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/ari/merged_ari.parquet')
+  WHERE 都道府県 = '総数' AND 急性呼吸器感染症_定当 IS NOT NULL
+  ORDER BY 年, 週
+`);
 ```
 
 <div class="grid grid-cols-1">
@@ -977,17 +982,16 @@ const ariHeatmap = ariDataFiltered.map(d => ({
 ## 🦠 麻しん・風しん
 
 ```js
-const measlesYearly = Array.from(
-  d3.group(
-    zensuData.filter(d => d.都道府県 === "総数" && d.麻しん_報告 != null && d.年 >= 2012),
-    d => d.年
-  ),
-  ([year, values]) => ({
-    年: year,
-    麻しん: d3.sum(values, d => d.麻しん_報告),
-    風しん: d3.sum(values, d => d.風しん_報告)
-  })
-).sort((a, b) => a.年 - b.年);
+const measlesYearly = Array.from(await sql`
+  SELECT 
+    年,
+    SUM(麻しん_報告) as 麻しん,
+    SUM(風しん_報告) as 風しん
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
+  WHERE 都道府県 = '総数' AND 麻しん_報告 IS NOT NULL AND 年 >= 2012
+  GROUP BY 年
+  ORDER BY 年
+`);
 
 const measlesLatest = measlesYearly[measlesYearly.length - 1];
 ```
@@ -1063,15 +1067,25 @@ const measlesLatest = measlesYearly[measlesYearly.length - 1];
 ## 📊 多疾病比較：インフルエンザ vs COVID-19（2020年以降）
 
 ```js
-const flu = teitenData
-  .filter(d => d.都道府県 === "総数" && d.インフルエンザ_定当 != null && d.年 >= 2020)
-  .map(d => ({date: new Date(d.開始日), value: d.インフルエンザ_定当, type: "インフルエンザ"}));
-
-const covid = teitenData
-  .filter(d => d.都道府県 === "総数" && d["COVID-19_定当"] != null && d.年 >= 2020)
-  .map(d => ({date: new Date(d.開始日), value: d["COVID-19_定当"], type: "COVID-19"}));
-
-const comparison = [...flu, ...covid].sort((a, b) => a.date - b.date);
+const comparison = Array.from(await sql`
+  SELECT 
+    開始日::TIMESTAMP as date,
+    インフルエンザ_定当 as value,
+    'インフルエンザ' as type
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
+  WHERE 都道府県 = '総数' AND インフルエンザ_定当 IS NOT NULL AND 年 >= 2020
+  
+  UNION ALL
+  
+  SELECT 
+    開始日::TIMESTAMP as date,
+    "COVID-19_定当" as value,
+    'COVID-19' as type
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/teiten/merged_teiten.parquet')
+  WHERE 都道府県 = '総数' AND "COVID-19_定当" IS NOT NULL AND 年 >= 2020
+  
+  ORDER BY date
+`);
 ```
 
 <div class="grid grid-cols-1">
