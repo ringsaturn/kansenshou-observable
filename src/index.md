@@ -395,12 +395,12 @@ const covidHeatmap = heatmapData(teitenData, "COVID-19_定当", 2020);
 ```js
 const syphilisYearly = Array.from(
   d3.group(
-    zensuData.filter(d => d.都道府県 === "総数" && d.梅毒_累積 != null),
+    zensuData.filter(d => d.都道府県 === "総数" && d.梅毒_報告 != null),
     d => d.年
   ),
   ([year, values]) => ({
     年: year,
-    年間総報告数: d3.max(values, d => d.梅毒_累積)
+    年間総報告数: d3.sum(values, d => d.梅毒_報告)
   })
 ).sort((a, b) => a.年 - b.年);
 
@@ -491,7 +491,7 @@ function syphilisCard(latest, yearly) {
 
 ```js
 const syphilisWeekly = zensuData
-  .filter(d => d.都道府県 === "総数" && d.梅毒_累積 != null && d.年 >= 2015)
+  .filter(d => d.都道府県 === "総数" && d.梅毒_報告 != null && d.年 >= 2015)
   .sort((a, b) => a.年 * 100 + a.週 - (b.年 * 100 + b.週));
 
 const syphilisHeatmap = Array.from(
@@ -500,27 +500,27 @@ const syphilisHeatmap = Array.from(
     Array.from(weeks, ([week, records]) => ({
       年: year,
       週: week,
-      値: records[0].梅毒_累積
+      値: records[0].梅毒_報告
     }))
 ).flat();
 ```
 
 <div class="grid grid-cols-1">
   <div class="card">
-    <h2>梅毒 - 週別熱力図</h2>
-    ${heatmapPlot(syphilisHeatmap, "梅毒_累積", "梅毒")}
+    <h2>梅毒 - 週別熱力図（週報告数）</h2>
+    ${heatmapPlot(syphilisHeatmap, "梅毒_報告", "梅毒")}
   </div>
 </div>
 
 ```js
 const pertussisYearly = Array.from(
   d3.group(
-    zensuData.filter(d => d.都道府県 === "総数" && d.百日咳_累積 != null),
+    zensuData.filter(d => d.都道府県 === "総数" && d.百日咳_報告 != null),
     d => d.年
   ),
   ([year, values]) => ({
     年: year,
-    年間総報告数: d3.max(values, d => d.百日咳_累積)
+    年間総報告数: d3.sum(values, d => d.百日咳_報告)
   })
 ).sort((a, b) => a.年 - b.年);
 
@@ -611,7 +611,7 @@ function pertussisCard(latest, yearly) {
 
 ```js
 const pertussisWeekly = zensuData
-  .filter(d => d.都道府県 === "総数" && d.百日咳_累積 != null && d.年 >= 2015)
+  .filter(d => d.都道府県 === "総数" && d.百日咳_報告 != null && d.年 >= 2015)
   .sort((a, b) => a.年 * 100 + a.週 - (b.年 * 100 + b.週));
 
 const pertussisHeatmap = Array.from(
@@ -620,15 +620,15 @@ const pertussisHeatmap = Array.from(
     Array.from(weeks, ([week, records]) => ({
       年: year,
       週: week,
-      値: records[0].百日咳_累積
+      値: records[0].百日咳_報告
     }))
 ).flat();
 ```
 
 <div class="grid grid-cols-1">
   <div class="card">
-    <h2>百日咳 - 週別熱力図</h2>
-    ${heatmapPlot(pertussisHeatmap, "百日咳_累積", "百日咳")}
+    <h2>百日咳 - 週別熱力図（週報告数）</h2>
+    ${heatmapPlot(pertussisHeatmap, "百日咳_報告", "百日咳")}
   </div>
 </div>
 
@@ -979,13 +979,13 @@ const ariHeatmap = ariDataFiltered.map(d => ({
 ```js
 const measlesYearly = Array.from(
   d3.group(
-    zensuData.filter(d => d.都道府県 === "総数" && d.麻しん_累積 != null && d.年 >= 2012),
+    zensuData.filter(d => d.都道府県 === "総数" && d.麻しん_報告 != null && d.年 >= 2012),
     d => d.年
   ),
   ([year, values]) => ({
     年: year,
-    麻しん: d3.max(values, d => d.麻しん_累積),
-    風しん: d3.max(values, d => d.風しん_累積)
+    麻しん: d3.sum(values, d => d.麻しん_報告),
+    風しん: d3.sum(values, d => d.風しん_報告)
   })
 ).sort((a, b) => a.年 - b.年);
 
