@@ -25,7 +25,9 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - run: bun run build
+      - run: |
+          bun install
+          bun run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
