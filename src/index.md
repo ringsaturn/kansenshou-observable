@@ -383,13 +383,19 @@ const covidHeatmap = Array.from(await sql`
 
 ```js
 const syphilisYearly = Array.from(await sql`
+  WITH last_week AS (
+    SELECT 年, MAX(週) as max_week
+    FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
+    WHERE 都道府県 = '総数' AND 梅毒_累積 IS NOT NULL
+    GROUP BY 年
+  )
   SELECT 
-    年,
-    SUM(梅毒_報告) as 年間総報告数
-  FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
-  WHERE 都道府県 = '総数' AND 梅毒_報告 IS NOT NULL
-  GROUP BY 年
-  ORDER BY 年
+    z.年,
+    z.梅毒_累積 as 年間総報告数
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet') z
+  JOIN last_week lw ON z.年 = lw.年 AND z.週 = lw.max_week
+  WHERE z.都道府県 = '総数' AND z.梅毒_累積 IS NOT NULL
+  ORDER BY z.年
 `);
 
 const syphilisLatest = syphilisYearly[syphilisYearly.length - 1];
@@ -496,15 +502,24 @@ const syphilisHeatmap = Array.from(await sql`
   </div>
 </div>
 
+
+## 🦠 百日咳
+
 ```js
 const pertussisYearly = Array.from(await sql`
+  WITH last_week AS (
+    SELECT 年, MAX(週) as max_week
+    FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
+    WHERE 都道府県 = '総数' AND 百日咳_累積 IS NOT NULL
+    GROUP BY 年
+  )
   SELECT 
-    年,
-    SUM(百日咳_報告) as 年間総報告数
-  FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
-  WHERE 都道府県 = '総数' AND 百日咳_報告 IS NOT NULL
-  GROUP BY 年
-  ORDER BY 年
+    z.年,
+    z.百日咳_累積 as 年間総報告数
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet') z
+  JOIN last_week lw ON z.年 = lw.年 AND z.週 = lw.max_week
+  WHERE z.都道府県 = '総数' AND z.百日咳_累積 IS NOT NULL
+  ORDER BY z.年
 `);
 
 const pertussisLatest = pertussisYearly[pertussisYearly.length - 1];
@@ -983,14 +998,20 @@ const ariHeatmap = Array.from(await sql`
 
 ```js
 const measlesYearly = Array.from(await sql`
+  WITH last_week AS (
+    SELECT 年, MAX(週) as max_week
+    FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
+    WHERE 都道府県 = '総数' AND 麻しん_累積 IS NOT NULL AND 年 >= 2012
+    GROUP BY 年
+  )
   SELECT 
-    年,
-    SUM(麻しん_報告) as 麻しん,
-    SUM(風しん_報告) as 風しん
-  FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet')
-  WHERE 都道府県 = '総数' AND 麻しん_報告 IS NOT NULL AND 年 >= 2012
-  GROUP BY 年
-  ORDER BY 年
+    z.年,
+    z.麻しん_累積 as 麻しん,
+    z.風しん_累積 as 風しん
+  FROM read_parquet('https://kansenshou.ringsaturn.me/data/zensu/merged_zensu.parquet') z
+  JOIN last_week lw ON z.年 = lw.年 AND z.週 = lw.max_week
+  WHERE z.都道府県 = '総数' AND z.麻しん_累積 IS NOT NULL
+  ORDER BY z.年
 `);
 
 const measlesLatest = measlesYearly[measlesYearly.length - 1];
